@@ -39,14 +39,14 @@ misskey:
   url: "https://misskey.example.com"
   token: "YOUR_MISSKEY_API_TOKEN"
 reaction:
-  note_id: "your_note_id_here"
   emoji: "👍"
+  match_text: "特定の文字列"
 ```
 
 -   `misskey.url`: MisskeyインスタンスのベースURL（例: `https://misskey.example.com`）。
 -   `misskey.token`: あなたのMisskey APIトークン。Misskeyの設定から生成できます。
--   `reaction.note_id`: リアクションを追加したいMisskeyノートのID。（必須）
 -   `reaction.emoji`: 追加するリアクションの絵文字またはカスタム絵文字名（例: `👍`、`:awesome:`）。指定しない場合、デフォルトは `👍` です。
+-   `reaction.match_text`: リアクションを行うノートのテキストに含まれるべき特定の文字列。空の場合、すべてのノートにリアクションします。
 
 ## 使用方法
 
@@ -71,8 +71,8 @@ misskey:
   url: "https://misskey.example.com"
   token: "YOUR_MISSKEY_API_TOKEN"
 reaction:
-  note_id: "9s0d8f7g6h5j4k3l2m1n"
   emoji: "🎉"
+  match_text: "テスト"
 ```
 
 その後、ツールを実行します。

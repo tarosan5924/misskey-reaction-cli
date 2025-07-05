@@ -35,7 +35,6 @@ type Config struct {
 		Token string `yaml:"token"`
 	} `yaml:"misskey"`
 	Reaction struct {
-		NoteID   string `yaml:"note_id"`
 		Emoji    string `yaml:"emoji"`
 		MatchText string `yaml:"match_text"`
 	} `yaml:"reaction"`

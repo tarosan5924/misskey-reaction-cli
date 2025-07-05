@@ -180,9 +180,6 @@ reaction:
 	if config.Misskey.Token != "test_token_123" {
 		t.Errorf("期待するMisskey Token: %s, 実際: %s", "test_token_123", config.Misskey.Token)
 	}
-	if config.Reaction.NoteID != "test_note_id_456" {
-		t.Errorf("期待するNote ID: %s, 実際: %s", "test_note_id_456", config.Reaction.NoteID)
-	}
 	if config.Reaction.Emoji != ":test_emoji:" {
 		t.Errorf("期待するReaction Emoji: %s, 実際: %s", ":test_emoji:", config.Reaction.Emoji)
 	}
