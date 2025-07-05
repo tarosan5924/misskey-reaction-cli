@@ -30,7 +30,7 @@
 
 ## 設定
 
-このツールは、`config.yaml` という設定ファイルから設定を読み込みます。実行可能ファイルと同じディレクトリに配置してください。
+このツールは、`config.yaml` という設定ファイルから設定を読み込みます。デフォルトでは実行可能ファイルと同じディレクトリの `config.yaml` を探しますが、`-config` フラグで別のパスを指定することもできます。
 
 **`config.yaml` の例:**
 
@@ -54,6 +54,12 @@ reaction:
 
 ```bash
 ./misskey-reaction-cli
+```
+
+または、`-config` フラグで設定ファイルのパスを指定します。
+
+```bash
+./misskey-reaction-cli -config /path/to/your/custom_config.yaml
 ```
 
 **例:**

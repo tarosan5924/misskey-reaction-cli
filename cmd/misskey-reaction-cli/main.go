@@ -3,10 +3,9 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	
+	"flag"
 	"fmt"
 	"io"
-	
 	"net/http"
 	"os"
 
@@ -112,26 +111,22 @@ func createReaction(misskeyURL, noteID, reaction, token string) error {
 	return nil
 }
 
-func main() {
+func runApp(fs *flag.FlagSet, configPath string, stdout, stderr io.Writer) error {
 	// 設定ファイルを読み込む
-	config, err := loadConfig("config.yaml")
+	config, err := loadConfig(configPath)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return fmt.Errorf("設定ファイルの読み込みに失敗しました: %w", err)
 	}
 
 	// 設定値のバリデーション
 	if config.Misskey.URL == "" {
-		fmt.Fprintln(os.Stderr, "エラー: 設定ファイルにMisskeyのURLが指定されていません")
-		os.Exit(1)
+		return fmt.Errorf("エラー: 設定ファイルにMisskeyのURLが指定されていません")
 	}
 	if config.Misskey.Token == "" {
-		fmt.Fprintln(os.Stderr, "エラー: 設定ファイルにMisskeyのAPIトークンが指定されていません")
-		os.Exit(1)
+		return fmt.Errorf("エラー: 設定ファイルにMisskeyのAPIトークンが指定されていません")
 	}
 	if config.Reaction.NoteID == "" {
-		fmt.Fprintln(os.Stderr, "エラー: 設定ファイルにリアクション対象のノートIDが指定されていません")
-		os.Exit(1)
+		return fmt.Errorf("エラー: 設定ファイルにリアクション対象のノートIDが指定されていません")
 	}
 	// リアクションが指定されていない場合はデフォルト値を使用
 	if config.Reaction.Emoji == "" {
@@ -139,10 +134,23 @@ func main() {
 	}
 
 	if err := createReaction(config.Misskey.URL, config.Reaction.NoteID, config.Reaction.Emoji, config.Misskey.Token); err != nil {
+		return err
+	}
+
+	fmt.Fprintf(stdout, "ノート %s に %s でリアクションしました\n", config.Reaction.NoteID, config.Reaction.Emoji)
+	return nil
+}
+
+func main() {
+	fs := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	configPath := fs.String("config", "config.yaml", "設定ファイルのパス")
+	if err := fs.Parse(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-
-	fmt.Printf("ノート %s に %s でリアクションしました\n", config.Reaction.NoteID, config.Reaction.Emoji)
+	if err := runApp(fs, *configPath, os.Stdout, os.Stderr); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 }
 

@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"flag"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -60,6 +63,31 @@ func TestCreateReaction_APIError(t *testing.T) {
 	expectedError := "API error: ノートが見つかりません。"
 	if !strings.Contains(err.Error(), expectedError) {
 		t.Errorf("エラーメッセージに '%s' が含まれることを期待しましたが、実際は: %v", expectedError, err)
+	}
+}
+
+func TestRunApp_ConfigPathFlag(t *testing.T) {
+	// テスト用のFlagSetを作成
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	var stdout, stderr bytes.Buffer
+	fs.SetOutput(&stderr) // エラー出力をキャプチャ
+
+	configPath := "testdata/custom_config.yaml"
+	// コマンドライン引数を設定
+	fs.String("config", configPath, "設定ファイルのパス")
+
+	// runApp を呼び出す
+	err := runApp(fs, configPath, &stdout, &stderr)
+
+	// エラーが返されることを期待する（まだ実装されていないため）
+	if err == nil {
+		t.Fatal("エラーが発生することを期待しましたが、発生しませんでした")
+	}
+
+	// エラーメッセージに設定ファイルパスが含まれていることを確認
+	expectedErrorPart := fmt.Sprintf("設定ファイルを開けませんでした: open %s: no such file or directory", configPath)
+	if !strings.Contains(err.Error(), expectedErrorPart) {
+		t.Errorf("期待するエラーメッセージの一部 '%s' が含まれていませんでした: %v", expectedErrorPart, err)
 	}
 }
 
