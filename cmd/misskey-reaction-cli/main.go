@@ -10,13 +10,13 @@ import (
 	"os"
 )
 
-// Request body for the Misskey API
+// Misskey APIへのリクエストボディ
 type reactionRequest struct {
 	NoteID   string `json:"noteId"`
 	Reaction string `json:"reaction"`
 }
 
-// Misskey API error response structure
+// Misskey APIのエラーレスポンス構造体
 type misskeyErrorResponse struct {
 	Error struct {
 		Message string `json:"message"`
@@ -77,26 +77,26 @@ func createReaction(misskeyURL, noteID, reaction, token string) error {
 }
 
 func main() {
-	// Environment variables
+	// 環境変数
 	misskeyURL := os.Getenv("MISSKEY_URL")
 	if misskeyURL == "" {
-		fmt.Fprintln(os.Stderr, "Error: MISSKEY_URL environment variable not set")
+		fmt.Fprintln(os.Stderr, "エラー: MISSKEY_URL 環境変数が設定されていません")
 		os.Exit(1)
 	}
 
 	misskeyToken := os.Getenv("MISSKEY_TOKEN")
 	if misskeyToken == "" {
-		fmt.Fprintln(os.Stderr, "Error: MISSKEY_TOKEN environment variable not set")
+		fmt.Fprintln(os.Stderr, "エラー: MISSKEY_TOKEN 環境変数が設定されていません")
 		os.Exit(1)
 	}
 
-	// Command-line flags
-	noteID := flag.String("note-id", "", "The ID of the note to react to")
-	reaction := flag.String("reaction", "👍", "The reaction to add to the note")
+	// コマンドライン引数
+	noteID := flag.String("note-id", "", "リアクションするノートのID")
+	reaction := flag.String("reaction", "👍", "ノートに追加するリアクション")
 	flag.Parse()
 
 	if *noteID == "" {
-		fmt.Fprintln(os.Stderr, "Error: -note-id flag is required")
+		fmt.Fprintln(os.Stderr, "エラー: -note-id フラグは必須です")
 		flag.Usage()
 		os.Exit(1)
 	}
@@ -106,6 +106,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Printf("Successfully reacted to note %s with %s\n", *noteID, *reaction)
+	fmt.Printf("ノート %s に %s でリアクションしました\n", *noteID, *reaction)
 }
 

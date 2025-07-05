@@ -1,80 +1,80 @@
-# Misskey Reaction CLI Tool
+# MisskeyリアクションCLIツール
 
-This is a simple command-line interface (CLI) tool written in Go to add reactions to Misskey notes.
+これは、Go言語で書かれたMisskeyのノートにリアクションを追加するためのシンプルなコマンドラインインターフェース（CLI）ツールです。
 
-## Features
+## 機能
 
-- Add reactions to a specified Misskey note.
-- Configurable via environment variables.
+- 指定されたMisskeyノートにリアクションを追加します。
+- 環境変数を通じて設定可能です。
 
-## Requirements
+## 要件
 
-- Go (version 1.16 or higher)
+- Go (バージョン 1.16 以降)
 
-## Installation
+## インストール
 
-1.  **Clone the repository (if applicable):**
+1.  **リポジトリのクローン (該当する場合):**
 
     ```bash
     git clone https://github.com/your-username/misskey-reaction-cli.git
     cd misskey-reaction-cli
     ```
 
-2.  **Build the executable:**
+2.  **実行可能ファイルのビルド:**
 
     ```bash
     go build -o misskey-reaction-cli cmd/misskey-reaction-cli/main.go
     ```
 
-    This will create an executable named `misskey-reaction-cli` in your current directory.
+    これにより、現在のディレクトリに `misskey-reaction-cli` という名前の実行可能ファイルが作成されます。
 
-## Configuration
+## 設定
 
-This tool requires the following environment variables to be set:
+このツールは、以下の環境変数を設定する必要があります。
 
--   `MISSKEY_URL`: The base URL of your Misskey instance (e.g., `https://misskey.example.com`).
--   `MISSKEY_TOKEN`: Your Misskey API token. You can generate one from your Misskey settings.
+-   `MISSKEY_URL`: MisskeyインスタンスのベースURL（例: `https://misskey.example.com`）。
+-   `MISSKEY_TOKEN`: あなたのMisskey APIトークン。Misskeyの設定から生成できます。
 
-**Example (Linux/macOS):**
+**例 (Linux/macOS):**
 
 ```bash
 export MISSKEY_URL="https://misskey.example.com"
 export MISSKEY_TOKEN="YOUR_MISSKEY_API_TOKEN"
 ```
 
-**Example (Windows Command Prompt):**
+**例 (Windows コマンドプロンプト):**
 
 ```cmd
 set MISSKEY_URL=https://misskey.example.com
 set MISSKEY_TOKEN=YOUR_MISSKEY_API_TOKEN
 ```
 
-## Usage
+## 使用方法
 
-Run the executable with the required flags:
+必要なフラグを指定して実行します。
 
 ```bash
-./misskey-reaction-cli -note-id <NOTE_ID> -reaction <REACTION>
+./misskey-reaction-cli -note-id <ノートID> -reaction <リアクション>
 ```
 
--   `-note-id`: The ID of the Misskey note you want to react to. (Required)
--   `-reaction`: The reaction emoji or custom emoji name (e.g., `👍`, `:awesome:`). Defaults to `👍` if not specified.
+-   `-note-id`: リアクションを追加したいMisskeyノートのID。（必須）
+-   `-reaction`: 追加するリアクションの絵文字またはカスタム絵文字名（例: `👍`、`:awesome:`）。指定しない場合、デフォルトは `👍` です。
 
-**Example:**
+**例:**
 
 ```bash
 ./misskey-reaction-cli -note-id "9s0d8f7g6h5j4k3l2m1n" -reaction "🎉"
 ```
 
-## Error Handling
+## エラーハンドリング
 
-The tool provides basic error handling for missing environment variables, required command-line flags, and Misskey API errors.
+このツールは、環境変数の不足、必須コマンドラインフラグの不足、Misskey APIエラーに対する基本的なエラーハンドリングを提供します。
 
-## Development
+## 開発
 
-### Running Tests
+### テストの実行
 
-To run the unit tests:
+ユニットテストを実行するには：
 
 ```bash
 go test ./...

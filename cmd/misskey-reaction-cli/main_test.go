@@ -9,55 +9,55 @@ import (
 )
 
 func TestCreateReaction_Success(t *testing.T) {
-	// Mock Misskey API server
+	// モックMisskey APIサーバー
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Check request method
+		// リクエストメソッドをチェック
 		if r.Method != http.MethodPost {
-			t.Errorf("Expected POST request, got %s", r.Method)
+			t.Errorf("POSTリクエストを期待しましたが、%sが来ました", r.Method)
 		}
-		// Check request path
+		// リクエストパスをチェック
 		if r.URL.Path != "/api/notes/reactions/create" {
-			t.Errorf("Expected path /api/notes/reactions/create, got %s", r.URL.Path)
+			t.Errorf("パス /api/notes/reactions/create を期待しましたが、%sが来ました", r.URL.Path)
 		}
-		// No body to check, just return success
+		// ボディはチェックせず、成功を返す
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer server.Close()
 
-	// Call the function to be tested (it doesn't exist yet)
+	// テスト対象の関数を呼び出す
 	err := createReaction(server.URL, "testNoteId", "👍", "testToken")
 
-	// Check the result
+	// 結果をチェックする
 	if err != nil {
-		t.Errorf("Expected no error, but got: %v", err)
+		t.Errorf("エラーが発生しないことを期待しましたが、発生しました: %v", err)
 	}
 }
 
 func TestCreateReaction_APIError(t *testing.T) {
-	// Mock Misskey API server that returns an error
+	// エラーを返すMisskey APIのモックサーバー
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest) // 400 Bad Request
-		// A typical Misskey error response
+		// Misskeyのエラーレスポンスの典型的な形式
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"error": map[string]string{
-				"message": "Note not found.",
+				"message": "ノートが見つかりません。",
 				"code":    "NOTE_NOT_FOUND",
 			},
 		})
 	}))
 	defer server.Close()
 
-	// Call the function to be tested
+	// テスト対象の関数を呼び出す
 	err := createReaction(server.URL, "invalidNoteId", "👍", "testToken")
 
-	// Check the result
+	// 結果をチェックする
 	if err == nil {
-		t.Fatal("Expected an error, but got none")
+		t.Fatal("エラーが発生することを期待しましたが、発生しませんでした")
 	}
 
-	expectedError := "API error: Note not found."
+	expectedError := "API error: ノートが見つかりません。"
 	if !strings.Contains(err.Error(), expectedError) {
-		t.Errorf("Expected error message to contain '%s', but got: %v", expectedError, err)
+		t.Errorf("エラーメッセージに '%s' が含まれることを期待しましたが、実際は: %v", expectedError, err)
 	}
 }
