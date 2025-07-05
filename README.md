@@ -5,7 +5,7 @@
 ## 機能
 
 - 指定されたMisskeyノートにリアクションを追加します。
-- 環境変数を通じて設定可能です。
+- 設定ファイルを通じて設定可能です。
 
 ## 要件
 
@@ -30,45 +30,54 @@
 
 ## 設定
 
-このツールは、以下の環境変数を設定する必要があります。
+このツールは、`config.yaml` という設定ファイルから設定を読み込みます。実行可能ファイルと同じディレクトリに配置してください。
 
--   `MISSKEY_URL`: MisskeyインスタンスのベースURL（例: `https://misskey.example.com`）。
--   `MISSKEY_TOKEN`: あなたのMisskey APIトークン。Misskeyの設定から生成できます。
+**`config.yaml` の例:**
 
-**例 (Linux/macOS):**
-
-```bash
-export MISSKEY_URL="https://misskey.example.com"
-export MISSKEY_TOKEN="YOUR_MISSKEY_API_TOKEN"
+```yaml
+misskey:
+  url: "https://misskey.example.com"
+  token: "YOUR_MISSKEY_API_TOKEN"
+reaction:
+  note_id: "your_note_id_here"
+  emoji: "👍"
 ```
 
-**例 (Windows コマンドプロンプト):**
-
-```cmd
-set MISSKEY_URL=https://misskey.example.com
-set MISSKEY_TOKEN=YOUR_MISSKEY_API_TOKEN
-```
+-   `misskey.url`: MisskeyインスタンスのベースURL（例: `https://misskey.example.com`）。
+-   `misskey.token`: あなたのMisskey APIトークン。Misskeyの設定から生成できます。
+-   `reaction.note_id`: リアクションを追加したいMisskeyノートのID。（必須）
+-   `reaction.emoji`: 追加するリアクションの絵文字またはカスタム絵文字名（例: `👍`、`:awesome:`）。指定しない場合、デフォルトは `👍` です。
 
 ## 使用方法
 
-必要なフラグを指定して実行します。
+設定ファイル (`config.yaml`) を準備した後、以下のコマンドでツールを実行します。
 
 ```bash
-./misskey-reaction-cli -note-id <ノートID> -reaction <リアクション>
+./misskey-reaction-cli
 ```
-
--   `-note-id`: リアクションを追加したいMisskeyノートのID。（必須）
--   `-reaction`: 追加するリアクションの絵文字またはカスタム絵文字名（例: `👍`、`:awesome:`）。指定しない場合、デフォルトは `👍` です。
 
 **例:**
 
+`config.yaml` に以下の内容を記述します。
+
+```yaml
+misskey:
+  url: "https://misskey.example.com"
+  token: "YOUR_MISSKEY_API_TOKEN"
+reaction:
+  note_id: "9s0d8f7g6h5j4k3l2m1n"
+  emoji: "🎉"
+```
+
+その後、ツールを実行します。
+
 ```bash
-./misskey-reaction-cli -note-id "9s0d8f7g6h5j4k3l2m1n" -reaction "🎉"
+./misskey-reaction-cli
 ```
 
 ## エラーハンドリング
 
-このツールは、環境変数の不足、必須コマンドラインフラグの不足、Misskey APIエラーに対する基本的なエラーハンドリングを提供します。
+このツールは、設定ファイルの不足、設定値の不足、Misskey APIエラーに対する基本的なエラーハンドリングを提供します。
 
 ## 開発
 

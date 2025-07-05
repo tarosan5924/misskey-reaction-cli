@@ -3,11 +3,14 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"flag"
+	
 	"fmt"
 	"io"
+	
 	"net/http"
 	"os"
+
+	yaml "gopkg.in/yaml.v2"
 )
 
 // Misskey APIへのリクエストボディ
@@ -22,6 +25,39 @@ type misskeyErrorResponse struct {
 		Message string `json:"message"`
 		Code    string `json:"code,omitempty"`
 	}
+}
+
+// Config struct to hold application settings
+type Config struct {
+	Misskey struct {
+		URL   string `yaml:"url"`
+		Token string `yaml:"token"`
+	} `yaml:"misskey"`
+	Reaction struct {
+		NoteID string `yaml:"note_id"`
+		Emoji  string `yaml:"emoji"`
+	} `yaml:"reaction"`
+}
+
+// loadConfig reads the configuration from the specified YAML file.
+func loadConfig(configPath string) (*Config, error) {
+	file, err := os.Open(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("設定ファイルを開けませんでした: %w", err)
+	}
+	defer file.Close()
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return nil, fmt.Errorf("設定ファイルの読み込みに失敗しました: %w", err)
+	}
+
+	var config Config
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("設定ファイルのパースに失敗しました: %w", err)
+	}
+
+	return &config, nil
 }
 
 func createReaction(misskeyURL, noteID, reaction, token string) error {
@@ -77,35 +113,36 @@ func createReaction(misskeyURL, noteID, reaction, token string) error {
 }
 
 func main() {
-	// 環境変数
-	misskeyURL := os.Getenv("MISSKEY_URL")
-	if misskeyURL == "" {
-		fmt.Fprintln(os.Stderr, "エラー: MISSKEY_URL 環境変数が設定されていません")
-		os.Exit(1)
-	}
-
-	misskeyToken := os.Getenv("MISSKEY_TOKEN")
-	if misskeyToken == "" {
-		fmt.Fprintln(os.Stderr, "エラー: MISSKEY_TOKEN 環境変数が設定されていません")
-		os.Exit(1)
-	}
-
-	// コマンドライン引数
-	noteID := flag.String("note-id", "", "リアクションするノートのID")
-	reaction := flag.String("reaction", "👍", "ノートに追加するリアクション")
-	flag.Parse()
-
-	if *noteID == "" {
-		fmt.Fprintln(os.Stderr, "エラー: -note-id フラグは必須です")
-		flag.Usage()
-		os.Exit(1)
-	}
-
-	if err := createReaction(misskeyURL, *noteID, *reaction, misskeyToken); err != nil {
+	// 設定ファイルを読み込む
+	config, err := loadConfig("config.yaml")
+	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("ノート %s に %s でリアクションしました\n", *noteID, *reaction)
+	// 設定値のバリデーション
+	if config.Misskey.URL == "" {
+		fmt.Fprintln(os.Stderr, "エラー: 設定ファイルにMisskeyのURLが指定されていません")
+		os.Exit(1)
+	}
+	if config.Misskey.Token == "" {
+		fmt.Fprintln(os.Stderr, "エラー: 設定ファイルにMisskeyのAPIトークンが指定されていません")
+		os.Exit(1)
+	}
+	if config.Reaction.NoteID == "" {
+		fmt.Fprintln(os.Stderr, "エラー: 設定ファイルにリアクション対象のノートIDが指定されていません")
+		os.Exit(1)
+	}
+	// リアクションが指定されていない場合はデフォルト値を使用
+	if config.Reaction.Emoji == "" {
+		config.Reaction.Emoji = "👍"
+	}
+
+	if err := createReaction(config.Misskey.URL, config.Reaction.NoteID, config.Reaction.Emoji, config.Misskey.Token); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("ノート %s に %s でリアクションしました\n", config.Reaction.NoteID, config.Reaction.Emoji)
 }
 
