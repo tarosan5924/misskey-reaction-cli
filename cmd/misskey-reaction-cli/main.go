@@ -8,7 +8,9 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 
+	"github.com/gorilla/websocket"
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -33,8 +35,9 @@ type Config struct {
 		Token string `yaml:"token"`
 	} `yaml:"misskey"`
 	Reaction struct {
-		NoteID string `yaml:"note_id"`
-		Emoji  string `yaml:"emoji"`
+		NoteID   string `yaml:"note_id"`
+		Emoji    string `yaml:"emoji"`
+		MatchText string `yaml:"match_text"`
 	} `yaml:"reaction"`
 }
 
@@ -111,7 +114,66 @@ func createReaction(misskeyURL, noteID, reaction, token string) error {
 	return nil
 }
 
+// MisskeyストリーミングAPIのノートイベント構造体
+type streamNoteEvent struct {
+	Type string `json:"type"`
+	Body struct {
+		ID   string `json:"id"`
+		Type string `json:"type"`
+		Body struct {
+			ID   string `json:"id"`
+			Text string `json:"text"`
+			// 他のノートのフィールドは必要に応じて追加
+		} `json:"body"`
+	} `json:"body"`
+}
+
+// streamNotes connects to the Misskey streaming API and calls the callback for each note.
+func streamNotes(wsURL, token string, noteCallback func(noteID, noteText string)) error {
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		return fmt.Errorf("WebSocket接続に失敗しました: %w", err)
+	}
+	defer conn.Close()
+
+	// チャンネルに接続するためのメッセージを送信
+	connectMsg := map[string]interface{}{
+		"type": "connect",
+		"body": map[string]string{
+			"channel": "hybridTimeline",
+			"id":      "main-channel-id", // 任意のID
+		},
+	}
+
+	// トークンをメッセージに追加
+	connectMsgBody := connectMsg["body"].(map[string]string)
+	connectMsgBody["i"] = token
+
+	if err := conn.WriteJSON(connectMsg); err != nil {
+		return fmt.Errorf("WebSocketメッセージの送信に失敗しました: %w", err)
+	}
+
+	for {
+		_, message, err := conn.ReadMessage()
+		if err != nil {
+			return fmt.Errorf("WebSocketメッセージの読み込みに失敗しました: %w", err)
+		}
+
+		var event streamNoteEvent
+		if err := json.Unmarshal(message, &event); err != nil {
+			// エラーをログに出力するが、処理は続行
+			fmt.Fprintf(os.Stderr, "エラー: WebSocketメッセージのパースに失敗しました: %v, メッセージ: %s\n", err, string(message))
+			continue
+		}
+
+		if event.Type == "channel" && event.Body.Type == "note" {
+			noteCallback(event.Body.Body.ID, event.Body.Body.Text)
+		}
+	}
+}
+
 func runApp(fs *flag.FlagSet, configPath string, stdout, stderr io.Writer) error {
+
 	// 設定ファイルを読み込む
 	config, err := loadConfig(configPath)
 	if err != nil {
@@ -125,19 +187,34 @@ func runApp(fs *flag.FlagSet, configPath string, stdout, stderr io.Writer) error
 	if config.Misskey.Token == "" {
 		return fmt.Errorf("エラー: 設定ファイルにMisskeyのAPIトークンが指定されていません")
 	}
-	if config.Reaction.NoteID == "" {
-		return fmt.Errorf("エラー: 設定ファイルにリアクション対象のノートIDが指定されていません")
-	}
+
 	// リアクションが指定されていない場合はデフォルト値を使用
 	if config.Reaction.Emoji == "" {
 		config.Reaction.Emoji = "👍"
 	}
 
-	if err := createReaction(config.Misskey.URL, config.Reaction.NoteID, config.Reaction.Emoji, config.Misskey.Token); err != nil {
-		return err
+	// ストリーミングAPIのURLを構築
+	wsURL := strings.Replace(config.Misskey.URL, "http", "ws", 1) + "/streaming?i=" + config.Misskey.Token
+
+	fmt.Fprintf(stdout, "MisskeyストリーミングAPIに接続中... %s\n", wsURL)
+
+	// ストリーミングAPIからノートを受信し、リアクションを投稿
+	err = streamNotes(wsURL, config.Misskey.Token, func(noteID, noteText string) {
+		// 特定文字列に合致するかチェック
+		if config.Reaction.MatchText != "" && !strings.Contains(noteText, config.Reaction.MatchText) {
+			return // 合致しない場合はスキップ
+		}
+
+		fmt.Fprintf(stdout, "ノートID: %s, テキスト: %s にリアクション %s を投稿します\n", noteID, noteText, config.Reaction.Emoji)
+		if err := createReaction(config.Misskey.URL, noteID, config.Reaction.Emoji, config.Misskey.Token); err != nil {
+			fmt.Fprintf(stderr, "エラー: リアクションの投稿に失敗しました: %v\n", err)
+		}
+	})
+
+	if err != nil {
+		return fmt.Errorf("ストリーミングAPIの処理中にエラーが発生しました: %w", err)
 	}
 
-	fmt.Fprintf(stdout, "ノート %s に %s でリアクションしました\n", config.Reaction.NoteID, config.Reaction.Emoji)
 	return nil
 }
 
@@ -153,4 +230,3 @@ func main() {
 		os.Exit(1)
 	}
 }
-

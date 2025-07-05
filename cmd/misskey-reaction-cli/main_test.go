@@ -10,6 +10,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/gorilla/websocket"
 )
 
 func TestCreateReaction_Success(t *testing.T) {
@@ -89,6 +91,56 @@ func TestRunApp_ConfigPathFlag(t *testing.T) {
 	if !strings.Contains(err.Error(), expectedErrorPart) {
 		t.Errorf("期待するエラーメッセージの一部 '%s' が含まれていませんでした: %v", expectedErrorPart, err)
 	}
+}
+
+func TestStreamNotes(t *testing.T) {
+	// モックWebSocketサーバーをセットアップ
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := websocket.Upgrade(w, r, nil, 1024, 1024)
+		if err != nil {
+			t.Fatalf("WebSocketアップグレードに失敗しました: %v", err)
+		}
+		defer conn.Close()
+
+		// テスト用のノートイベントを送信
+		noteEvent := streamNoteEvent{
+			Type: "channel",
+			Body: struct {
+				ID   string `json:"id"`
+				Type string `json:"type"`
+				Body struct {
+					ID   string `json:"id"`
+					Text string `json:"text"`
+				} `json:"body"`
+			}{
+				ID:   "testChannelId",
+				Type: "note",
+				Body: struct {
+					ID   string `json:"id"`
+					Text string `json:"text"`
+				}{
+					ID:   "testNoteId123",
+					Text: "これはテストノートです",
+				},
+			},
+		}
+		jsonBytes, _ := json.Marshal(noteEvent)
+		conn.WriteMessage(websocket.TextMessage, jsonBytes)
+
+		// クライアントからのメッセージを待つ（接続維持のため）
+		conn.ReadMessage()
+	}))
+	defer server.Close()
+
+	// WebSocket URLをHTTPからWSに変換
+	wsURL := "ws" + server.URL[len("http"):]
+
+	// テスト対象の関数を呼び出す
+	streamNotes(wsURL, "testToken", func(noteID, noteText string) {
+		// コールバックが呼び出されたことを確認するためのロジックをここに追加
+		// 例: チャネルに通知を送信し、テスト側で受信を待つ
+		// 現状は、コンパイルエラーになることを期待する
+	})
 }
 
 func TestLoadConfig(t *testing.T) {
