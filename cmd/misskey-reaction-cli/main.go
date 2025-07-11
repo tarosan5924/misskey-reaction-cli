@@ -35,8 +35,9 @@ type Config struct {
 		Token string `yaml:"token"`
 	} `yaml:"misskey"`
 	Reaction struct {
-		Emoji    string `yaml:"emoji"`
+		Emoji     string `yaml:"emoji"`
 		MatchText string `yaml:"match_text"`
+		MatchType string `yaml:"match_type"`
 	} `yaml:"reaction"`
 }
 
@@ -171,6 +172,19 @@ func streamNotes(wsURL, token string, noteCallback func(noteID, noteText string)
 	}
 }
 
+func checkTextMatch(noteText string, config *Config) bool {
+	switch config.Reaction.MatchType {
+	case "prefix":
+		return strings.HasPrefix(noteText, config.Reaction.MatchText)
+	case "suffix":
+		return strings.HasSuffix(noteText, config.Reaction.MatchText)
+	case "contains", "": // デフォルトは部分一致
+		return strings.Contains(noteText, config.Reaction.MatchText)
+	default:
+		return false
+	}
+}
+
 func runApp(fs *flag.FlagSet, configPath string, stdout, stderr io.Writer) error {
 
 	// 設定ファイルを読み込む
@@ -186,6 +200,9 @@ func runApp(fs *flag.FlagSet, configPath string, stdout, stderr io.Writer) error
 	if config.Misskey.Token == "" {
 		return fmt.Errorf("エラー: 設定ファイルにMisskeyのAPIトークンが指定されていません")
 	}
+	if config.Reaction.MatchText == "" {
+		return fmt.Errorf("エラー: 設定ファイルにリアクション対象の文字列(match_text)が指定されていません")
+	}
 
 	// リアクションが指定されていない場合はデフォルト値を使用
 	if config.Reaction.Emoji == "" {
@@ -200,7 +217,7 @@ func runApp(fs *flag.FlagSet, configPath string, stdout, stderr io.Writer) error
 	// ストリーミングAPIからノートを受信し、リアクションを投稿
 	err = streamNotes(wsURL, config.Misskey.Token, func(noteID, noteText string) {
 		// 特定文字列に合致するかチェック
-		if config.Reaction.MatchText != "" && !strings.Contains(noteText, config.Reaction.MatchText) {
+		if !checkTextMatch(noteText, config) {
 			return // 合致しない場合はスキップ
 		}
 

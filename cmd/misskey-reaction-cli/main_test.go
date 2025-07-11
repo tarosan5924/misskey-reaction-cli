@@ -150,7 +150,6 @@ misskey:
   url: "https://test.misskey.example.com"
   token: "test_token_123"
 reaction:
-  note_id: "test_note_id_456"
   emoji: ":test_emoji:"
 `
 
@@ -182,5 +181,85 @@ reaction:
 	}
 	if config.Reaction.Emoji != ":test_emoji:" {
 		t.Errorf("期待するReaction Emoji: %s, 実際: %s", ":test_emoji:", config.Reaction.Emoji)
+	}
+}
+
+func TestRunApp_MissingMatchTextError(t *testing.T) {
+	// モックの設定ファイルの内容 (match_textを含まない)
+	configContent := `
+misskey:
+  url: "https://test.misskey.example.com"
+  token: "test_token_123"
+reaction:
+  emoji: "👍"
+`
+	// 一時ファイルに設定内容を書き込む
+	tmpfile, err := os.CreateTemp("", "config-*.yaml")
+	if err != nil {
+		t.Fatalf("一時ファイルの作成に失敗しました: %v", err)
+	}
+	defer os.Remove(tmpfile.Name())
+	defer tmpfile.Close()
+
+	_, err = tmpfile.WriteString(configContent)
+	if err != nil {
+		t.Fatalf("一時ファイルへの書き込みに失敗しました: %v", err)
+	}
+
+	// テスト用のFlagSetを作成
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	var stdout, stderr bytes.Buffer
+	fs.SetOutput(&stderr) // エラー出力をキャプチャ
+
+	// runApp を呼び出す
+	err = runApp(fs, tmpfile.Name(), &stdout, &stderr)
+
+	// エラーが返されることを期待する
+	if err == nil {
+		t.Fatal("エラーが発生することを期待しましたが、発生しませんでした")
+	}
+
+	// エラーメッセージを検証する
+	expectedError := "エラー: 設定ファイルにリアクション対象の文字列(match_text)が指定されていません"
+	if err.Error() != expectedError {
+		t.Errorf("期待するエラーメッセージ: '%s', 実際: '%s'", expectedError, err.Error())
+	}
+}
+
+func TestCheckTextMatch(t *testing.T) {
+	tests := []struct {
+		name       string
+		matchType  string
+		noteText   string
+		matchText  string
+		expected   bool
+	}{
+		{"前方一致_一致", "prefix", "hello world", "hello", true},
+		{"前方一致_不一致", "prefix", "hello world", "world", false},
+		{"後方一致_一致", "suffix", "hello world", "world", true},
+		{"後方一致_不一致", "suffix", "hello world", "hello", false},
+		{"部分一致_一致", "contains", "hello world", "lo wo", true},
+		{"部分一致_不一致", "contains", "hello world", "wollo", false},
+		{"デフォルト(部分一致)_一致", "", "hello world", "lo wo", true},
+		{"デフォルト(部分一致)_不一致", "", "hello world", "wollo", false},
+		{"無効なタイプ", "invalid", "hello world", "hello", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := &Config{
+				Reaction: struct {
+					Emoji      string `yaml:"emoji"`
+					MatchText  string `yaml:"match_text"`
+					MatchType  string `yaml:"match_type"`
+				}{
+					MatchText: tt.matchText,
+					MatchType: tt.matchType,
+				},
+			}
+			if checkTextMatch(tt.noteText, config) != tt.expected {
+				t.Errorf("期待値: %v, 実際: %v", tt.expected, !tt.expected)
+			}
+		})
 	}
 }

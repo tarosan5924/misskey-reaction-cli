@@ -41,12 +41,17 @@ misskey:
 reaction:
   emoji: "👍"
   match_text: "特定の文字列"
+  match_type: "contains"
 ```
 
 -   `misskey.url`: MisskeyインスタンスのベースURL（例: `https://misskey.example.com`）。
 -   `misskey.token`: あなたのMisskey APIトークン。Misskeyの設定から生成できます。
 -   `reaction.emoji`: 追加するリアクションの絵文字またはカスタム絵文字名（例: `👍`、`:awesome:`）。指定しない場合、デフォルトは `👍` です。
--   `reaction.match_text`: リアクションを行うノートのテキストに含まれるべき特定の文字列。空の場合、すべてのノートにリアクションします。
+-   `reaction.match_text`: リアクションを行うノートのテキストに含まれるべき特定の文字列。
+-   `reaction.match_type`: `match_text`とノートのテキストを比較する方法を指定します。以下のいずれかを指定できます。
+    -   `prefix`: 前方一致
+    -   `suffix`: 後方一致
+    -   `contains`: 部分一致（デフォルト）
 
 ## 使用方法
 
