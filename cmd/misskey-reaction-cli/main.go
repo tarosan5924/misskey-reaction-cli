@@ -140,7 +140,7 @@ func streamNotes(wsURL, token string, noteCallback func(noteID, noteText string)
 	connectMsg := map[string]interface{}{
 		"type": "connect",
 		"body": map[string]string{
-			"channel": "hybridTimeline",
+			"channel": "homeTimeline",
 			"id":      "main-channel-id", // 任意のID
 		},
 	}
