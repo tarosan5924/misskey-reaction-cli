@@ -6,9 +6,11 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/gorilla/websocket"
 	yaml "gopkg.in/yaml.v2"
@@ -220,6 +222,10 @@ func runApp(fs *flag.FlagSet, configPath string, stdout, stderr io.Writer) error
 		if !checkTextMatch(noteText, config) {
 			return // 合致しない場合はスキップ
 		}
+
+		// 即時リアクションが来るのは怖いので若干遅延させる
+		delay := time.Duration(rand.Intn(4)+5) * time.Second
+		time.Sleep(delay)
 
 		fmt.Fprintf(stdout, "ノートID: %s, テキスト: %s にリアクション %s を投稿します\n", noteID, noteText, config.Reaction.Emoji)
 		if err := createReaction(config.Misskey.URL, noteID, config.Reaction.Emoji, config.Misskey.Token); err != nil {
