@@ -78,6 +78,7 @@ misskey:
 reaction:
   emoji: "🎉"
   match_text: "テスト"
+  match_type: "contains"
 ```
 
 その後、ツールを実行します。
