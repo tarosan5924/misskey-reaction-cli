@@ -1,0 +1,7 @@
+misskey:
+  url: "https://example.com"
+  token: "YOUR_TOKEN"
+reaction:
+  emoji: "👍"
+  match_text: "hello"
+  match_type: "contains"
