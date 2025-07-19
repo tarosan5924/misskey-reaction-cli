@@ -263,3 +263,144 @@ func TestCheckTextMatch(t *testing.T) {
 		})
 	}
 }
+
+func TestLoadConfig_InvalidYaml(t *testing.T) {
+	// 無効なYAMLコンテンツ
+	configContent := `
+misskey:
+  url: "https://test.misskey.example.com"
+  token: "test_token_123"
+reaction:
+  emoji: ":test_emoji:"
+  match_text: "hello
+`
+
+	// 一時ファイルに設定内容を書き込む
+	tmpfile, err := os.CreateTemp("", "config-*.yaml")
+	if err != nil {
+		t.Fatalf("一時ファイルの作成に失敗しました: %v", err)
+	}
+	defer os.Remove(tmpfile.Name())
+	defer tmpfile.Close()
+
+	_, err = tmpfile.WriteString(configContent)
+	if err != nil {
+		t.Fatalf("一時ファイルへの書き込みに失敗しました: %v", err)
+	}
+
+	// テスト対象の関数を呼び出す
+	_, err = loadConfig(tmpfile.Name())
+	if err == nil {
+		t.Fatal("エラーが発生することを期待しましたが、発生しませんでした")
+	}
+
+	// エラーメッセージを検証する
+	expectedErrorPart := "設定ファイルのパースに失敗しました"
+	if !strings.Contains(err.Error(), expectedErrorPart) {
+		t.Errorf("期待するエラーメッセージ '%s' が含まれていませんでした: %v", expectedErrorPart, err)
+	}
+}
+
+func TestRunApp_MissingURL(t *testing.T) {
+	configContent := `
+misskey:
+  token: "test_token_123"
+reaction:
+  match_text: "hello"
+`
+	tmpfile, err := os.CreateTemp("", "config-*.yaml")
+	if err != nil {
+		t.Fatalf("一時ファイルの作成に失敗しました: %v", err)
+	}
+	defer os.Remove(tmpfile.Name())
+	defer tmpfile.Close()
+	tmpfile.WriteString(configContent)
+
+	var stdout, stderr bytes.Buffer
+	err = runApp(tmpfile.Name(), &stdout, &stderr)
+
+	if err == nil {
+		t.Fatal("エラーが発生することを期待しましたが、発生しませんでした")
+	}
+	expectedError := "エラー: 設定ファイルにMisskeyのURLが指定されていません"
+	if err.Error() != expectedError {
+		t.Errorf("期待するエラーメッセージ: '%s', 実際: '%s'", expectedError, err.Error())
+	}
+}
+
+func TestRunApp_MissingToken(t *testing.T) {
+	configContent := `
+misskey:
+  url: "https://test.misskey.example.com"
+reaction:
+  match_text: "hello"
+`
+	tmpfile, err := os.CreateTemp("", "config-*.yaml")
+	if err != nil {
+		t.Fatalf("一時ファイルの作成に失敗しました: %v", err)
+	}
+	defer os.Remove(tmpfile.Name())
+	defer tmpfile.Close()
+	tmpfile.WriteString(configContent)
+
+	var stdout, stderr bytes.Buffer
+	err = runApp(tmpfile.Name(), &stdout, &stderr)
+
+	if err == nil {
+		t.Fatal("エラーが発生することを期待しましたが、発生しませんでした")
+	}
+	expectedError := "エラー: 設定ファイルにMisskeyのAPIトークンが指定されていません"
+	if err.Error() != expectedError {
+		t.Errorf("期待するエラーメッセージ: '%s', 実際: '%s'", expectedError, err.Error())
+	}
+}
+
+func TestCreateReaction_RequestCreationError(t *testing.T) {
+	// 無効なURLを渡してリクエスト作成を失敗させる
+	err := createReaction("http://invalid url", "noteId", "reaction", "token")
+	if err == nil {
+		t.Fatal("エラーが発生することを期待しましたが、発生しませんでした")
+	}
+	if !strings.Contains(err.Error(), "failed to create request") {
+		t.Errorf("期待するエラーメッセージが含まれていませんでした: %v", err)
+	}
+}
+
+func TestStreamNotes_DialError(t *testing.T) {
+	// 存在しないサーバーへの接続を試みる
+	err := streamNotes("ws://localhost:9999", "token", func(noteID, noteText string) {
+		t.Error("コールバックが呼び出されるべきではありません")
+	})
+	if err == nil {
+		t.Fatal("エラーが発生することを期待しましたが、発生しませんでした")
+	}
+	if !strings.Contains(err.Error(), "WebSocket接続に失敗しました") {
+		t.Errorf("期待するエラーメッセージが含まれていませんでした: %v", err)
+	}
+}
+
+func TestRun_flags(t *testing.T) {
+	var stderr bytes.Buffer
+	// 不正な引数を渡して、パースエラーを発生させる
+	err := run([]string{"cmd", "-invalid-flag"}, nil, &stderr)
+	if err == nil {
+		t.Fatal("エラーが発生することを期待しましたが、発生しませんでした")
+	}
+	expectedError := "flag provided but not defined: -invalid-flag"
+	if !strings.Contains(err.Error(), expectedError) {
+		t.Errorf("期待するエラーメッセージ '%s' が含まれていませんでした: %v", expectedError, err)
+	}
+}
+
+func TestRun_runAppError(t *testing.T) {
+	var stderr bytes.Buffer
+	// configファイルが存在しない場合のエラーをテスト
+	err := run([]string{"cmd", "-config", "non-existent-file.yaml"}, nil, &stderr)
+	if err == nil {
+		t.Fatal("エラーが発生することを期待しましたが、発生しませんでした")
+	}
+	expectedError := "設定ファイルを開けませんでした"
+	if !strings.Contains(err.Error(), expectedError) {
+		t.Errorf("期待するエラーメッセージ '%s' が含まれていませんでした: %v", expectedError, err)
+	}
+}

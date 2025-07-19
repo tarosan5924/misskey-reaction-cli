@@ -240,15 +240,21 @@ func runApp(configPath string, stdout, stderr io.Writer) error {
 	return nil
 }
 
-func main() {
-	fs := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+func run(args []string, stdout, stderr io.Writer) error {
+	fs := flag.NewFlagSet(args[0], flag.ContinueOnError)
+	fs.SetOutput(stderr)
 	configPath := fs.String("config", "config.yaml", "設定ファイルのパス")
-	if err := fs.Parse(os.Args[1:]); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+
+	if err := fs.Parse(args[1:]); err != nil {
+		return err
 	}
-	if err := runApp(*configPath, os.Stdout, os.Stderr); err != nil {
+	return runApp(*configPath, stdout, stderr)
+}
+
+func main() {
+	if err := run(os.Args, os.Stdout, os.Stderr); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
+
