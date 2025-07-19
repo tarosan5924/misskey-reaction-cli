@@ -3,8 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"flag"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -68,31 +66,6 @@ func TestCreateReaction_APIError(t *testing.T) {
 	}
 }
 
-func TestRunApp_ConfigPathFlag(t *testing.T) {
-	// テスト用のFlagSetを作成
-	fs := flag.NewFlagSet("test", flag.ContinueOnError)
-	var stdout, stderr bytes.Buffer
-	fs.SetOutput(&stderr) // エラー出力をキャプチャ
-
-	configPath := "testdata/custom_config.yaml"
-	// コマンドライン引数を設定
-	fs.String("config", configPath, "設定ファイルのパス")
-
-	// runApp を呼び出す
-	err := runApp(configPath, &stdout, &stderr)
-
-	// エラーが返されることを期待する（まだ実装されていないため）
-	if err == nil {
-		t.Fatal("エラーが発生することを期待しましたが、発生しませんでした")
-	}
-
-	// エラーメッセージに設定ファイルパスが含まれていることを確認
-	expectedErrorPart := fmt.Sprintf("設定ファイルを開けませんでした: open %s: no such file or directory", configPath)
-	if !strings.Contains(err.Error(), expectedErrorPart) {
-		t.Errorf("期待するエラーメッセージの一部 '%s' が含まれていませんでした: %v", expectedErrorPart, err)
-	}
-}
-
 func TestStreamNotes(t *testing.T) {
 	// モックWebSocketサーバーをセットアップ
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -137,9 +110,7 @@ func TestStreamNotes(t *testing.T) {
 
 	// テスト対象の関数を呼び出す
 	streamNotes(wsURL, "testToken", func(noteID, noteText string) {
-		// コールバックが呼び出されたことを確認するためのロジックをここに追加
-		// 例: チャネルに通知を送信し、テスト側で受信を待つ
-		// 現状は、コンパイルエラーになることを期待する
+		// This is a dummy callback for testing compilation
 	})
 }
 
@@ -166,7 +137,7 @@ reaction:
 		t.Fatalf("一時ファイルへの書き込みに失敗しました: %v", err)
 	}
 
-	// テスト対象の関数を呼び出す (まだ存在しない)
+	// テスト対象の関数を呼び出す
 	config, err := loadConfig(tmpfile.Name())
 	if err != nil {
 		t.Fatalf("設定の読み込みに失敗しました: %v", err)
@@ -181,48 +152,6 @@ reaction:
 	}
 	if config.Reaction.Emoji != ":test_emoji:" {
 		t.Errorf("期待するReaction Emoji: %s, 実際: %s", ":test_emoji:", config.Reaction.Emoji)
-	}
-}
-
-func TestRunApp_MissingMatchTextError(t *testing.T) {
-	// モックの設定ファイルの内容 (match_textを含まない)
-	configContent := `
-misskey:
-  url: "https://test.misskey.example.com"
-  token: "test_token_123"
-reaction:
-  emoji: "👍"
-`
-	// 一時ファイルに設定内容を書き込む
-	tmpfile, err := os.CreateTemp("", "config-*.yaml")
-	if err != nil {
-		t.Fatalf("一時ファイルの作成に失敗しました: %v", err)
-	}
-	defer os.Remove(tmpfile.Name())
-	defer tmpfile.Close()
-
-	_, err = tmpfile.WriteString(configContent)
-	if err != nil {
-		t.Fatalf("一時ファイルへの書き込みに失敗しました: %v", err)
-	}
-
-	// テスト用のFlagSetを作成
-	fs := flag.NewFlagSet("test", flag.ContinueOnError)
-	var stdout, stderr bytes.Buffer
-	fs.SetOutput(&stderr) // エラー出力をキャプチャ
-
-	// runApp を呼び出す
-	err = runApp(tmpfile.Name(), &stdout, &stderr)
-
-	// エラーが返されることを期待する
-	if err == nil {
-		t.Fatal("エラーが発生することを期待しましたが、発生しませんでした")
-	}
-
-	// エラーメッセージを検証する
-	expectedError := "エラー: 設定ファイルにリアクション対象の文字列(match_text)が指定されていません"
-	if err.Error() != expectedError {
-		t.Errorf("期待するエラーメッセージ: '%s', 実際: '%s'", expectedError, err.Error())
 	}
 }
 
@@ -302,22 +231,25 @@ reaction:
 }
 
 func TestRunApp_MissingURL(t *testing.T) {
-	configContent := `
-misskey:
-  token: "test_token_123"
-reaction:
-  match_text: "hello"
-`
-	tmpfile, err := os.CreateTemp("", "config-*.yaml")
-	if err != nil {
-		t.Fatalf("一時ファイルの作成に失敗しました: %v", err)
+	config := &Config{
+		Misskey: struct {
+			URL   string `yaml:"url"`
+			Token string `yaml:"token"`
+		}{
+			URL:   "", // URL is missing
+			Token: "test_token_123",
+		},
+		Reaction: struct {
+			Emoji     string `yaml:"emoji"`
+			MatchText string `yaml:"match_text"`
+			MatchType string `yaml:"match_type"`
+		}{
+			MatchText: "hello",
+		},
 	}
-	defer os.Remove(tmpfile.Name())
-	defer tmpfile.Close()
-	tmpfile.WriteString(configContent)
 
 	var stdout, stderr bytes.Buffer
-	err = runApp(tmpfile.Name(), &stdout, &stderr)
+	err := runApp(config, &stdout, &stderr)
 
 	if err == nil {
 		t.Fatal("エラーが発生することを期待しましたが、発生しませんでした")
@@ -329,27 +261,60 @@ reaction:
 }
 
 func TestRunApp_MissingToken(t *testing.T) {
-	configContent := `
-misskey:
-  url: "https://test.misskey.example.com"
-reaction:
-  match_text: "hello"
-`
-	tmpfile, err := os.CreateTemp("", "config-*.yaml")
-	if err != nil {
-		t.Fatalf("一時ファイルの作成に失敗しました: %v", err)
+	config := &Config{
+		Misskey: struct {
+			URL   string `yaml:"url"`
+			Token string `yaml:"token"`
+		}{
+			URL:   "https://test.misskey.example.com",
+			Token: "", // Token is missing
+		},
+		Reaction: struct {
+			Emoji     string `yaml:"emoji"`
+			MatchText string `yaml:"match_text"`
+			MatchType string `yaml:"match_type"`
+		}{
+			MatchText: "hello",
+		},
 	}
-	defer os.Remove(tmpfile.Name())
-	defer tmpfile.Close()
-	tmpfile.WriteString(configContent)
 
 	var stdout, stderr bytes.Buffer
-	err = runApp(tmpfile.Name(), &stdout, &stderr)
+	err := runApp(config, &stdout, &stderr)
 
 	if err == nil {
 		t.Fatal("エラーが発生することを期待しましたが、発生しませんでした")
 	}
 	expectedError := "エラー: 設定ファイルにMisskeyのAPIトークンが指定されていません"
+	if err.Error() != expectedError {
+		t.Errorf("期待するエラーメッセージ: '%s', 実際: '%s'", expectedError, err.Error())
+	}
+}
+
+func TestRunApp_MissingMatchText(t *testing.T) {
+	config := &Config{
+		Misskey: struct {
+			URL   string `yaml:"url"`
+			Token string `yaml:"token"`
+		}{
+			URL:   "https://test.misskey.example.com",
+			Token: "test_token_123",
+		},
+		Reaction: struct {
+			Emoji     string `yaml:"emoji"`
+			MatchText string `yaml:"match_text"`
+			MatchType string `yaml:"match_type"`
+		}{
+			MatchText: "", // MatchText is missing
+		},
+	}
+
+	var stdout, stderr bytes.Buffer
+	err := runApp(config, &stdout, &stderr)
+
+	if err == nil {
+		t.Fatal("エラーが発生することを期待しましたが、発生しませんでした")
+	}
+	expectedError := "エラー: 設定ファイルにリアクション対象の文字列(match_text)が指定されていません"
 	if err.Error() != expectedError {
 		t.Errorf("期待するエラーメッセージ: '%s', 実際: '%s'", expectedError, err.Error())
 	}
@@ -405,54 +370,48 @@ func TestRun_runAppError(t *testing.T) {
 	}
 }
 
-func TestRunApp_LogFile(t *testing.T) {
+func TestRunApp_LogFile_Error(t *testing.T) {
 	// 一時ログファイルを作成
 	tmpLogFile, err := os.CreateTemp("", "test-log-*.log")
 	if err != nil {
 		t.Fatalf("一時ログファイルの作成に失敗しました: %v", err)
 	}
 	logPath := tmpLogFile.Name()
-	tmpLogFile.Close() // すぐに閉じる
+	tmpLogFile.Close()
 	defer os.Remove(logPath)
 
-	// モックの設定ファイルの内容
-	configContent := fmt.Sprintf(`
-log_path: %s
-misskey:
-  url: "http://localhost:8080"
-  token: "test_token_123"
-reaction:
-  match_text: "hello"
-`, logPath)
-
-	tmpConfigFile, err := os.CreateTemp("", "config-*.yaml")
-	if err != nil {
-		t.Fatalf("一時設定ファイルの作成に失敗しました: %v", err)
-	}
-	defer os.Remove(tmpConfigFile.Name())
-	defer tmpConfigFile.Close()
-
-	_, err = tmpConfigFile.WriteString(configContent)
-	if err != nil {
-		t.Fatalf("一時設定ファイルへの書き込みに失敗しました: %v", err)
+	config := &Config{
+		LogPath: logPath,
+		Misskey: struct {
+			URL   string `yaml:"url"`
+			Token string `yaml:"token"`
+		}{
+			URL:   "", // URL is missing to cause an error
+			Token: "test_token_123",
+		},
+		Reaction: struct {
+			Emoji     string `yaml:"emoji"`
+			MatchText string `yaml:"match_text"`
+			MatchType string `yaml:"match_type"`
+		}{
+			MatchText: "hello",
+		},
 	}
 
-	// runAppを呼び出すが、すぐに終了させるためにストリーミング部分はモック化しない
-	// そのため、ここではエラーが発生することを期待する
 	var stdout, stderr bytes.Buffer
-	err = runApp(tmpConfigFile.Name(), &stdout, &stderr)
+	err = runApp(config, &stdout, &stderr)
 	if err == nil {
 		t.Fatal("エラーが発生することを期待しましたが、発生しませんでした")
 	}
 
-	// ログファイルに書き込まれていることを確認
+	// ログファイルにエラーメッセージが書き込まれていることを確認
 	logContent, err := os.ReadFile(logPath)
 	if err != nil {
 		t.Fatalf("ログファイルの読み込みに失敗しました: %v", err)
 	}
 
-	expectedLogPart := "MisskeyストリーミングAPIに接続中..."
-	if !strings.Contains(string(logContent), expectedLogPart) {
-		t.Errorf("ログファイルに期待する文字列 '%s' が含まれていませんでした: %s", expectedLogPart, string(logContent))
+	expectedLog := "エラー: 設定ファイルにMisskeyのURLが指定されていません"
+	if !strings.Contains(string(logContent), expectedLog) {
+		t.Errorf("ログファイルに期待するエラー '%s' が含まれていませんでした: %s", expectedLog, string(logContent))
 	}
 }

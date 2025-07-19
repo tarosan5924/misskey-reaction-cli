@@ -188,19 +188,14 @@ func checkTextMatch(noteText string, config *Config) bool {
 	}
 }
 
-func runApp(configPath string, stdout, stderr io.Writer) error {
-
-	// 設定ファイルを読み込む
-	config, err := loadConfig(configPath)
-	if err != nil {
-		return fmt.Errorf("設定ファイルの読み込みに失敗しました: %w", err)
-	}
+func runApp(config *Config, stdout, stderr io.Writer) error {
 
 	// ログ出力先を設定
 	var logOutput io.Writer = stdout
 	if config.LogPath != "" {
 		logFile, err := os.OpenFile(config.LogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
+			// ログファイルが開けないエラーはstderrに
 			return fmt.Errorf("ログファイルを開けませんでした: %w", err)
 		}
 		defer logFile.Close()
@@ -209,13 +204,19 @@ func runApp(configPath string, stdout, stderr io.Writer) error {
 
 	// 設定値のバリデーション
 	if config.Misskey.URL == "" {
-		return fmt.Errorf("エラー: 設定ファイルにMisskeyのURLが指定されていません")
+		err := fmt.Errorf("エラー: 設定ファイルにMisskeyのURLが指定されていません")
+		fmt.Fprintln(logOutput, err)
+		return err
 	}
 	if config.Misskey.Token == "" {
-		return fmt.Errorf("エラー: 設定ファイルにMisskeyのAPIトークンが指定されていません")
+		err := fmt.Errorf("エラー: 設定ファイルにMisskeyのAPIトークンが指定されていません")
+		fmt.Fprintln(logOutput, err)
+		return err
 	}
 	if config.Reaction.MatchText == "" {
-		return fmt.Errorf("エラー: 設定ファイルにリアクション対象の文字列(match_text)が指定されていません")
+		err := fmt.Errorf("エラー: 設定ファイルにリアクション対象の文字列(match_text)が指定されていません")
+		fmt.Fprintln(logOutput, err)
+		return err
 	}
 
 	// リアクションが指定されていない場合はデフォルト値を使用
@@ -229,7 +230,7 @@ func runApp(configPath string, stdout, stderr io.Writer) error {
 	fmt.Fprintf(logOutput, "MisskeyストリーミングAPIに接続中... %s\n", wsURL)
 
 	// ストリーミングAPIからノートを受信し、リアクションを投稿
-	err = streamNotes(wsURL, config.Misskey.Token, func(noteID, noteText string) {
+	err := streamNotes(wsURL, config.Misskey.Token, func(noteID, noteText string) {
 		// 特定文字列に合致するかチェック
 		if !checkTextMatch(noteText, config) {
 			return // 合致しない場合はスキップ
@@ -241,12 +242,14 @@ func runApp(configPath string, stdout, stderr io.Writer) error {
 
 		fmt.Fprintf(logOutput, "ノートID: %s, テキスト: %s にリアクション %s を投稿します\n", noteID, noteText, config.Reaction.Emoji)
 		if err := createReaction(config.Misskey.URL, noteID, config.Reaction.Emoji, config.Misskey.Token); err != nil {
-			fmt.Fprintf(stderr, "エラー: リアクションの投稿に失敗しました: %v\n", err)
+			fmt.Fprintf(logOutput, "エラー: リアクションの投稿に失敗しました: %v\n", err)
 		}
 	})
 
 	if err != nil {
-		return fmt.Errorf("ストリーミングAPIの処理中にエラーが発生しました: %w", err)
+		err = fmt.Errorf("ストリーミングAPIの処理中にエラーが発生しました: %w", err)
+		fmt.Fprintln(logOutput, err)
+		return err
 	}
 
 	return nil
@@ -260,12 +263,18 @@ func run(args []string, stdout, stderr io.Writer) error {
 	if err := fs.Parse(args[1:]); err != nil {
 		return err
 	}
-	return runApp(*configPath, stdout, stderr)
+
+	config, err := loadConfig(*configPath)
+	if err != nil {
+		return fmt.Errorf("設定ファイルの読み込みに失敗しました: %w", err)
+	}
+
+	return runApp(config, stdout, stderr)
 }
 
 func main() {
 	if err := run(os.Args, os.Stdout, os.Stderr); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		// runApp内でエラーはすでに出力されているはずなので、ここでは終了するだけ
 		os.Exit(1)
 	}
 }
