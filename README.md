@@ -42,7 +42,7 @@ reaction:
   emoji: "👍"
   match_text: "特定の文字列"
   match_type: "contains"
-  log_path: "/path/to/logfile.log"
+log_path: "/path/to/logfile.log"
 ```
 
 -   `misskey.url`: MisskeyインスタンスのベースURL（例: `https://misskey.example.com`）。
@@ -81,6 +81,7 @@ reaction:
   emoji: "🎉"
   match_text: "テスト"
   match_type: "contains"
+log_path: "/path/to/logfile.log"
 ```
 
 その後、ツールを実行します。
