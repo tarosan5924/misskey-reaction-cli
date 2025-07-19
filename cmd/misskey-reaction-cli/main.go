@@ -132,7 +132,7 @@ type streamNoteEvent struct {
 }
 
 // streamNotes connects to the Misskey streaming API and calls the callback for each note.
-func streamNotes(wsURL, token string, noteCallback func(noteID, noteText string)) error {
+func streamNotes(wsURL, token string, logOutput io.Writer, noteCallback func(noteID, noteText string)) error {
 	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if err != nil {
 		return fmt.Errorf("WebSocket接続に失敗しました: %w", err)
@@ -165,7 +165,7 @@ func streamNotes(wsURL, token string, noteCallback func(noteID, noteText string)
 		var event streamNoteEvent
 		if err := json.Unmarshal(message, &event); err != nil {
 			// エラーをログに出力するが、処理は続行
-			fmt.Fprintf(os.Stderr, "エラー: WebSocketメッセージのパースに失敗しました: %v, メッセージ: %s\n", err, string(message))
+			fmt.Fprintf(logOutput, "エラー: WebSocketメッセージのパースに失敗しました: %v, メッセージ: %s\n", err, string(message))
 			continue
 		}
 
@@ -211,7 +211,7 @@ func runApp(config *Config, logOutput io.Writer) error {
 	fmt.Fprintf(logOutput, "MisskeyストリーミングAPIに接続中... %s\n", wsURL)
 
 	// ストリーミングAPIからノートを受信し、リアクションを投稿
-	err := streamNotes(wsURL, config.Misskey.Token, func(noteID, noteText string) {
+	err := streamNotes(wsURL, config.Misskey.Token, logOutput, func(noteID, noteText string) {
 		// 特定文字列に合致するかチェック
 		if !checkTextMatch(noteText, config) {
 			return // 合致しない場合はスキップ

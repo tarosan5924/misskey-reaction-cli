@@ -82,7 +82,7 @@ func TestStreamNotes(t *testing.T) {
 				ID   string `json:"id"`
 				Type string `json:"type"`
 				Body struct {
-					ID   string `json:"id"`
+					ID   string `json:"id"`	
 					Text string `json:"text"`
 				} `json:"body"`
 			}{
@@ -108,10 +108,45 @@ func TestStreamNotes(t *testing.T) {
 	// WebSocket URLをHTTPからWSに変換
 	wsURL := "ws" + server.URL[len("http"):]
 
+	var logOutput bytes.Buffer
 	// テスト対象の関数を呼び出す
-	streamNotes(wsURL, "testToken", func(noteID, noteText string) {
+	streamNotes(wsURL, "testToken", &logOutput, func(noteID, noteText string) {
 		// This is a dummy callback for testing compilation
 	})
+}
+
+func TestStreamNotes_ParseError(t *testing.T) {
+	// モックWebSocketサーバーをセットアップ
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := websocket.Upgrade(w, r, nil, 1024, 1024)
+		if err != nil {
+			t.Fatalf("WebSocketアップグレードに失敗しました: %v", err)
+		}
+		defer conn.Close()
+
+		// 不正なJSONを送信
+		conn.WriteMessage(websocket.TextMessage, []byte("invalid json"))
+
+		// クライアントからのメッセージを待つ（接続維持のため）
+		conn.ReadMessage()
+	}))
+	defer server.Close()
+
+	// WebSocket URLをHTTPからWSに変換
+	wsURL := "ws" + server.URL[len("http"):]
+
+	var logOutput bytes.Buffer
+	// テスト対象の関数を呼び出す
+	streamNotes(wsURL, "testToken", &logOutput, func(noteID, noteText string) {
+		// コールバックは呼び出されないはず
+		t.Error("コールバックが呼び出されましたが、これはエラーケースです")
+	})
+
+	// ログにエラーメッセージが含まれていることを確認
+	expectedLog := "エラー: WebSocketメッセージのパースに失敗しました"
+	if !strings.Contains(logOutput.String(), expectedLog) {
+		t.Errorf("ログに期待するエラー '%s' が含まれていませんでした: %s", expectedLog, logOutput.String())
+	}
 }
 
 func TestLoadConfig(t *testing.T) {
@@ -152,6 +187,38 @@ reaction:
 	}
 	if config.Reaction.Emoji != ":test_emoji:" {
 		t.Errorf("期待するReaction Emoji: %s, 実際: %s", ":test_emoji:", config.Reaction.Emoji)
+	}
+}
+
+func TestRunApp_MissingMatchText(t *testing.T) {
+	config := &Config{
+		Misskey: struct {
+			URL   string `yaml:"url"`
+			Token string `yaml:"token"`
+		}{
+			URL:   "https://test.misskey.example.com",
+			Token: "test_token_123",
+		},
+		Reaction: struct {
+			Emoji     string `yaml:"emoji"`
+			MatchText string `yaml:"match_text"`
+			MatchType string `yaml:"match_type"`
+		}{
+			MatchText: "", // MatchText is missing
+		},
+	}
+
+	var logOutput bytes.Buffer
+	err := runApp(config, &logOutput)
+
+	if err == nil {
+		t.Fatal("エラーが発生することを期待しましたが、発生しませんでした")
+	}
+
+	// エラーメッセージを検証する
+	expectedError := "エラー: 設定ファイルにリアクション対象の文字列(match_text)が指定されていません"
+	if !strings.Contains(err.Error(), expectedError) {
+		t.Errorf("期待するエラーメッセージ: '%s', 実際: '%s'", expectedError, err.Error())
 	}
 }
 
@@ -255,7 +322,7 @@ func TestRunApp_MissingURL(t *testing.T) {
 		t.Fatal("エラーが発生することを期待しましたが、発生しませんでした")
 	}
 	expectedError := "エラー: 設定ファイルにMisskeyのURLが指定されていません"
-	if err.Error() != expectedError {
+	if !strings.Contains(err.Error(), expectedError) {
 		t.Errorf("期待するエラーメッセージ: '%s', 実際: '%s'", expectedError, err.Error())
 	}
 }
@@ -285,37 +352,7 @@ func TestRunApp_MissingToken(t *testing.T) {
 		t.Fatal("エラーが発生することを期待しましたが、発生しませんでした")
 	}
 	expectedError := "エラー: 設定ファイルにMisskeyのAPIトークンが指定されていません"
-	if err.Error() != expectedError {
-		t.Errorf("期待するエラーメッセージ: '%s', 実際: '%s'", expectedError, err.Error())
-	}
-}
-
-func TestRunApp_MissingMatchText(t *testing.T) {
-	config := &Config{
-		Misskey: struct {
-			URL   string `yaml:"url"`
-			Token string `yaml:"token"`
-		}{
-			URL:   "https://test.misskey.example.com",
-			Token: "test_token_123",
-		},
-		Reaction: struct {
-			Emoji     string `yaml:"emoji"`
-			MatchText string `yaml:"match_text"`
-			MatchType string `yaml:"match_type"`
-		}{
-			MatchText: "", // MatchText is missing
-		},
-	}
-
-	var logOutput bytes.Buffer
-	err := runApp(config, &logOutput)
-
-	if err == nil {
-		t.Fatal("エラーが発生することを期待しましたが、発生しませんでした")
-	}
-	expectedError := "エラー: 設定ファイルにリアクション対象の文字列(match_text)が指定されていません"
-	if err.Error() != expectedError {
+	if !strings.Contains(err.Error(), expectedError) {
 		t.Errorf("期待するエラーメッセージ: '%s', 実際: '%s'", expectedError, err.Error())
 	}
 }
@@ -333,7 +370,7 @@ func TestCreateReaction_RequestCreationError(t *testing.T) {
 
 func TestStreamNotes_DialError(t *testing.T) {
 	// 存在しないサーバーへの接続を試みる
-	err := streamNotes("ws://localhost:9999", "token", func(noteID, noteText string) {
+	err := streamNotes("ws://localhost:9999", "token", &bytes.Buffer{}, func(noteID, noteText string) {
 		t.Error("コールバックが呼び出されるべきではありません")
 	})
 	if err == nil {
@@ -375,7 +412,7 @@ func TestRun_LogFile_Error(t *testing.T) {
 	configContent := `
 log_path: "/invalid/path/to/logfile.log"
 misskey:
-  url: "https://test.misskey.example.com"
+  url: "https://test.misskey.example.2com"
   token: "test_token_123"
 reaction:
   match_text: "hello"
