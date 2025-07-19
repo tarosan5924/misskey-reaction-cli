@@ -248,8 +248,8 @@ func TestRunApp_MissingURL(t *testing.T) {
 		},
 	}
 
-	var stdout, stderr bytes.Buffer
-	err := runApp(config, &stdout, &stderr)
+	var logOutput bytes.Buffer
+	err := runApp(config, &logOutput)
 
 	if err == nil {
 		t.Fatal("エラーが発生することを期待しましたが、発生しませんでした")
@@ -278,8 +278,8 @@ func TestRunApp_MissingToken(t *testing.T) {
 		},
 	}
 
-	var stdout, stderr bytes.Buffer
-	err := runApp(config, &stdout, &stderr)
+	var logOutput bytes.Buffer
+	err := runApp(config, &logOutput)
 
 	if err == nil {
 		t.Fatal("エラーが発生することを期待しましたが、発生しませんでした")
@@ -308,8 +308,8 @@ func TestRunApp_MissingMatchText(t *testing.T) {
 		},
 	}
 
-	var stdout, stderr bytes.Buffer
-	err := runApp(config, &stdout, &stderr)
+	var logOutput bytes.Buffer
+	err := runApp(config, &logOutput)
 
 	if err == nil {
 		t.Fatal("エラーが発生することを期待しましたが、発生しませんでした")
@@ -364,54 +364,43 @@ func TestRun_runAppError(t *testing.T) {
 	if err == nil {
 		t.Fatal("エラーが発生することを期待しましたが、発生しませんでした")
 	}
-	expectedError := "設定ファイルを開けませんでした"
-	if !strings.Contains(err.Error(), expectedError) {
-		t.Errorf("期待するエラーメッセージ '%s' が含まれていませんでした: %v", expectedError, err)
+	expectedError := "設定ファイルの読み込みに失敗しました"
+	if !strings.Contains(stderr.String(), expectedError) {
+		t.Errorf("期待するエラーメッセージ '%s' が含まれていませんでした: %v", expectedError, stderr.String())
 	}
 }
 
-func TestRunApp_LogFile_Error(t *testing.T) {
-	// 一時ログファイルを作成
-	tmpLogFile, err := os.CreateTemp("", "test-log-*.log")
+func TestRun_LogFile_Error(t *testing.T) {
+	// 不正なログファイルパスを持つ設定ファイルを作成
+	configContent := `
+log_path: "/invalid/path/to/logfile.log"
+misskey:
+  url: "https://test.misskey.example.com"
+  token: "test_token_123"
+reaction:
+  match_text: "hello"
+`
+	tmpConfigFile, err := os.CreateTemp("", "config-*.yaml")
 	if err != nil {
-		t.Fatalf("一時ログファイルの作成に失敗しました: %v", err)
+		t.Fatalf("一時設定ファイルの作成に失敗しました: %v", err)
 	}
-	logPath := tmpLogFile.Name()
-	tmpLogFile.Close()
-	defer os.Remove(logPath)
+	defer os.Remove(tmpConfigFile.Name())
+	defer tmpConfigFile.Close()
 
-	config := &Config{
-		LogPath: logPath,
-		Misskey: struct {
-			URL   string `yaml:"url"`
-			Token string `yaml:"token"`
-		}{
-			URL:   "", // URL is missing to cause an error
-			Token: "test_token_123",
-		},
-		Reaction: struct {
-			Emoji     string `yaml:"emoji"`
-			MatchText string `yaml:"match_text"`
-			MatchType string `yaml:"match_type"`
-		}{
-			MatchText: "hello",
-		},
+	_, err = tmpConfigFile.WriteString(configContent)
+	if err != nil {
+		t.Fatalf("一時設定ファイルへの書き込みに失敗しました: %v", err)
 	}
 
 	var stdout, stderr bytes.Buffer
-	err = runApp(config, &stdout, &stderr)
+	err = run([]string{"cmd", "-config", tmpConfigFile.Name()}, &stdout, &stderr)
 	if err == nil {
 		t.Fatal("エラーが発生することを期待しましたが、発生しませんでした")
 	}
 
-	// ログファイルにエラーメッセージが書き込まれていることを確認
-	logContent, err := os.ReadFile(logPath)
-	if err != nil {
-		t.Fatalf("ログファイルの読み込みに失敗しました: %v", err)
-	}
-
-	expectedLog := "エラー: 設定ファイルにMisskeyのURLが指定されていません"
-	if !strings.Contains(string(logContent), expectedLog) {
-		t.Errorf("ログファイルに期待するエラー '%s' が含まれていませんでした: %s", expectedLog, string(logContent))
+	// stderrにエラーメッセージが書き込まれていることを確認
+	expectedError := "ログファイルを開けませんでした"
+	if !strings.Contains(stderr.String(), expectedError) {
+		t.Errorf("期待するエラー '%s' が含まれていませんでした: %s", expectedError, stderr.String())
 	}
 }

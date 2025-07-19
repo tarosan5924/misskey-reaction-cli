@@ -188,35 +188,16 @@ func checkTextMatch(noteText string, config *Config) bool {
 	}
 }
 
-func runApp(config *Config, stdout, stderr io.Writer) error {
-
-	// ログ出力先を設定
-	var logOutput io.Writer = stdout
-	if config.LogPath != "" {
-		logFile, err := os.OpenFile(config.LogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			// ログファイルが開けないエラーはstderrに
-			return fmt.Errorf("ログファイルを開けませんでした: %w", err)
-		}
-		defer logFile.Close()
-		logOutput = logFile
-	}
-
+func runApp(config *Config, logOutput io.Writer) error {
 	// 設定値のバリデーション
 	if config.Misskey.URL == "" {
-		err := fmt.Errorf("エラー: 設定ファイルにMisskeyのURLが指定されていません")
-		fmt.Fprintln(logOutput, err)
-		return err
+		return fmt.Errorf("エラー: 設定ファイルにMisskeyのURLが指定されていません")
 	}
 	if config.Misskey.Token == "" {
-		err := fmt.Errorf("エラー: 設定ファイルにMisskeyのAPIトークンが指定されていません")
-		fmt.Fprintln(logOutput, err)
-		return err
+		return fmt.Errorf("エラー: 設定ファイルにMisskeyのAPIトークンが指定されていません")
 	}
 	if config.Reaction.MatchText == "" {
-		err := fmt.Errorf("エラー: 設定ファイルにリアクション対象の文字列(match_text)が指定されていません")
-		fmt.Fprintln(logOutput, err)
-		return err
+		return fmt.Errorf("エラー: 設定ファイルにリアクション対象の文字列(match_text)が指定されていません")
 	}
 
 	// リアクションが指定されていない場合はデフォルト値を使用
@@ -247,9 +228,7 @@ func runApp(config *Config, stdout, stderr io.Writer) error {
 	})
 
 	if err != nil {
-		err = fmt.Errorf("ストリーミングAPIの処理中にエラーが発生しました: %w", err)
-		fmt.Fprintln(logOutput, err)
-		return err
+		return fmt.Errorf("ストリーミングAPIの処理中にエラーが発生しました: %w", err)
 	}
 
 	return nil
@@ -266,10 +245,30 @@ func run(args []string, stdout, stderr io.Writer) error {
 
 	config, err := loadConfig(*configPath)
 	if err != nil {
-		return fmt.Errorf("設定ファイルの読み込みに失敗しました: %w", err)
+		// 設定ファイル読み込み失敗は、ログファイルが不明なためstderrに出力
+		fmt.Fprintf(stderr, "設定ファイルの読み込みに失敗しました: %v\n", err)
+		return err
 	}
 
-	return runApp(config, stdout, stderr)
+	// ログ出力先を設定
+	var logOutput io.Writer = stdout
+	if config.LogPath != "" {
+		logFile, err := os.OpenFile(config.LogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			// ログファイルが開けないエラーはstderrに
+			fmt.Fprintf(stderr, "ログファイルを開けませんでした: %v\n", err)
+			return err
+		}
+		defer logFile.Close()
+		logOutput = logFile
+	}
+
+	if err := runApp(config, logOutput); err != nil {
+		fmt.Fprintln(logOutput, err)
+		return err
+	}
+
+	return nil
 }
 
 func main() {
