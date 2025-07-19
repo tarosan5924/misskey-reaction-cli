@@ -42,6 +42,7 @@ reaction:
   emoji: "👍"
   match_text: "特定の文字列"
   match_type: "contains"
+  log_path: "/path/to/logfile.log"
 ```
 
 -   `misskey.url`: MisskeyインスタンスのベースURL（例: `https://misskey.example.com`）。
@@ -52,6 +53,7 @@ reaction:
     -   `prefix`: 前方一致
     -   `suffix`: 後方一致
     -   `contains`: 部分一致（デフォルト）
+-   `log_path`: ログを出力するファイルのパス。指定しない場合、ログは標準出力に表示されます。
 
 ## 使用方法
 

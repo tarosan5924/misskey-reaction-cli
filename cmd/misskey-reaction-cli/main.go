@@ -32,6 +32,7 @@ type misskeyErrorResponse struct {
 
 // Config struct to hold application settings
 type Config struct {
+	LogPath string `yaml:"log_path"`
 	Misskey struct {
 		URL   string `yaml:"url"`
 		Token string `yaml:"token"`
@@ -195,6 +196,17 @@ func runApp(configPath string, stdout, stderr io.Writer) error {
 		return fmt.Errorf("設定ファイルの読み込みに失敗しました: %w", err)
 	}
 
+	// ログ出力先を設定
+	var logOutput io.Writer = stdout
+	if config.LogPath != "" {
+		logFile, err := os.OpenFile(config.LogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			return fmt.Errorf("ログファイルを開けませんでした: %w", err)
+		}
+		defer logFile.Close()
+		logOutput = logFile
+	}
+
 	// 設定値のバリデーション
 	if config.Misskey.URL == "" {
 		return fmt.Errorf("エラー: 設定ファイルにMisskeyのURLが指定されていません")
@@ -214,7 +226,7 @@ func runApp(configPath string, stdout, stderr io.Writer) error {
 	// ストリーミングAPIのURLを構築
 	wsURL := strings.Replace(config.Misskey.URL, "http", "ws", 1) + "/streaming?i=" + config.Misskey.Token
 
-	fmt.Fprintf(stdout, "MisskeyストリーミングAPIに接続中... %s\n", wsURL)
+	fmt.Fprintf(logOutput, "MisskeyストリーミングAPIに接続中... %s\n", wsURL)
 
 	// ストリーミングAPIからノートを受信し、リアクションを投稿
 	err = streamNotes(wsURL, config.Misskey.Token, func(noteID, noteText string) {
@@ -227,7 +239,7 @@ func runApp(configPath string, stdout, stderr io.Writer) error {
 		delay := time.Duration(rand.Intn(4)+5) * time.Second
 		time.Sleep(delay)
 
-		fmt.Fprintf(stdout, "ノートID: %s, テキスト: %s にリアクション %s を投稿します\n", noteID, noteText, config.Reaction.Emoji)
+		fmt.Fprintf(logOutput, "ノートID: %s, テキスト: %s にリアクション %s を投稿します\n", noteID, noteText, config.Reaction.Emoji)
 		if err := createReaction(config.Misskey.URL, noteID, config.Reaction.Emoji, config.Misskey.Token); err != nil {
 			fmt.Fprintf(stderr, "エラー: リアクションの投稿に失敗しました: %v\n", err)
 		}

@@ -404,3 +404,55 @@ func TestRun_runAppError(t *testing.T) {
 		t.Errorf("期待するエラーメッセージ '%s' が含まれていませんでした: %v", expectedError, err)
 	}
 }
+
+func TestRunApp_LogFile(t *testing.T) {
+	// 一時ログファイルを作成
+	tmpLogFile, err := os.CreateTemp("", "test-log-*.log")
+	if err != nil {
+		t.Fatalf("一時ログファイルの作成に失敗しました: %v", err)
+	}
+	logPath := tmpLogFile.Name()
+	tmpLogFile.Close() // すぐに閉じる
+	defer os.Remove(logPath)
+
+	// モックの設定ファイルの内容
+	configContent := fmt.Sprintf(`
+log_path: %s
+misskey:
+  url: "http://localhost:8080"
+  token: "test_token_123"
+reaction:
+  match_text: "hello"
+`, logPath)
+
+	tmpConfigFile, err := os.CreateTemp("", "config-*.yaml")
+	if err != nil {
+		t.Fatalf("一時設定ファイルの作成に失敗しました: %v", err)
+	}
+	defer os.Remove(tmpConfigFile.Name())
+	defer tmpConfigFile.Close()
+
+	_, err = tmpConfigFile.WriteString(configContent)
+	if err != nil {
+		t.Fatalf("一時設定ファイルへの書き込みに失敗しました: %v", err)
+	}
+
+	// runAppを呼び出すが、すぐに終了させるためにストリーミング部分はモック化しない
+	// そのため、ここではエラーが発生することを期待する
+	var stdout, stderr bytes.Buffer
+	err = runApp(tmpConfigFile.Name(), &stdout, &stderr)
+	if err == nil {
+		t.Fatal("エラーが発生することを期待しましたが、発生しませんでした")
+	}
+
+	// ログファイルに書き込まれていることを確認
+	logContent, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("ログファイルの読み込みに失敗しました: %v", err)
+	}
+
+	expectedLogPart := "MisskeyストリーミングAPIに接続中..."
+	if !strings.Contains(string(logContent), expectedLogPart) {
+		t.Errorf("ログファイルに期待する文字列 '%s' が含まれていませんでした: %s", expectedLogPart, string(logContent))
+	}
+}
