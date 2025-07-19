@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"math/rand"
 	"net/http"
 	"os"
@@ -132,7 +133,7 @@ type streamNoteEvent struct {
 }
 
 // streamNotes connects to the Misskey streaming API and calls the callback for each note.
-func streamNotes(wsURL, token string, logOutput io.Writer, noteCallback func(noteID, noteText string)) error {
+func streamNotes(wsURL, token string, logger *log.Logger, noteCallback func(noteID, noteText string)) error {
 	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if err != nil {
 		return fmt.Errorf("WebSocket接続に失敗しました: %w", err)
@@ -165,7 +166,7 @@ func streamNotes(wsURL, token string, logOutput io.Writer, noteCallback func(not
 		var event streamNoteEvent
 		if err := json.Unmarshal(message, &event); err != nil {
 			// エラーをログに出力するが、処理は続行
-			fmt.Fprintf(logOutput, "エラー: WebSocketメッセージのパースに失敗しました: %v, メッセージ: %s\n", err, string(message))
+			logger.Printf("エラー: WebSocketメッセージのパースに失敗しました: %v, メッセージ: %s\n", err, string(message))
 			continue
 		}
 
@@ -188,7 +189,7 @@ func checkTextMatch(noteText string, config *Config) bool {
 	}
 }
 
-func runApp(config *Config, logOutput io.Writer) error {
+func runApp(config *Config, logger *log.Logger) error {
 	// 設定値のバリデーション
 	if config.Misskey.URL == "" {
 		return fmt.Errorf("エラー: 設定ファイルにMisskeyのURLが指定されていません")
@@ -208,10 +209,10 @@ func runApp(config *Config, logOutput io.Writer) error {
 	// ストリーミングAPIのURLを構築
 	wsURL := strings.Replace(config.Misskey.URL, "http", "ws", 1) + "/streaming?i=" + config.Misskey.Token
 
-	fmt.Fprintf(logOutput, "MisskeyストリーミングAPIに接続中... %s\n", wsURL)
+	logger.Printf("MisskeyストリーミングAPIに接続中... %s\n", wsURL)
 
 	// ストリーミングAPIからノートを受信し、リアクションを投稿
-	err := streamNotes(wsURL, config.Misskey.Token, logOutput, func(noteID, noteText string) {
+	err := streamNotes(wsURL, config.Misskey.Token, logger, func(noteID, noteText string) {
 		// 特定文字列に合致するかチェック
 		if !checkTextMatch(noteText, config) {
 			return // 合致しない場合はスキップ
@@ -221,9 +222,9 @@ func runApp(config *Config, logOutput io.Writer) error {
 		delay := time.Duration(rand.Intn(4)+5) * time.Second
 		time.Sleep(delay)
 
-		fmt.Fprintf(logOutput, "ノートID: %s, テキスト: %s にリアクション %s を投稿します\n", noteID, noteText, config.Reaction.Emoji)
+		logger.Printf("ノートID: %s, テキスト: %s にリアクション %s を投稿します\n", noteID, noteText, config.Reaction.Emoji)
 		if err := createReaction(config.Misskey.URL, noteID, config.Reaction.Emoji, config.Misskey.Token); err != nil {
-			fmt.Fprintf(logOutput, "エラー: リアクションの投稿に失敗しました: %v\n", err)
+			logger.Printf("エラー: リアクションの投稿に失敗しました: %v\n", err)
 		}
 	})
 
@@ -251,7 +252,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 	}
 
 	// ログ出力先を設定
-	var logOutput io.Writer = stdout
+	var logWriter io.Writer = stdout
 	if config.LogPath != "" {
 		logFile, err := os.OpenFile(config.LogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 		if err != nil {
@@ -260,11 +261,13 @@ func run(args []string, stdout, stderr io.Writer) error {
 			return err
 		}
 		defer logFile.Close()
-		logOutput = logFile
+		logWriter = logFile
 	}
 
-	if err := runApp(config, logOutput); err != nil {
-		fmt.Fprintln(logOutput, err)
+	logger := log.New(logWriter, "", log.Ldate|log.Ltime)
+
+	if err := runApp(config, logger); err != nil {
+		logger.Println(err)
 		return err
 	}
 

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -108,9 +109,10 @@ func TestStreamNotes(t *testing.T) {
 	// WebSocket URLをHTTPからWSに変換
 	wsURL := "ws" + server.URL[len("http"):]
 
-	var logOutput bytes.Buffer
+	var logBuffer bytes.Buffer
+	logger := log.New(&logBuffer, "", log.Ldate|log.Ltime)
 	// テスト対象の関数を呼び出す
-	streamNotes(wsURL, "testToken", &logOutput, func(noteID, noteText string) {
+	streamNotes(wsURL, "testToken", logger, func(noteID, noteText string) {
 		// This is a dummy callback for testing compilation
 	})
 }
@@ -135,17 +137,18 @@ func TestStreamNotes_ParseError(t *testing.T) {
 	// WebSocket URLをHTTPからWSに変換
 	wsURL := "ws" + server.URL[len("http"):]
 
-	var logOutput bytes.Buffer
+	var logBuffer bytes.Buffer
+	logger := log.New(&logBuffer, "", log.Ldate|log.Ltime)
 	// テスト対象の関数を呼び出す
-	streamNotes(wsURL, "testToken", &logOutput, func(noteID, noteText string) {
+	streamNotes(wsURL, "testToken", logger, func(noteID, noteText string) {
 		// コールバックは呼び出されないはず
 		t.Error("コールバックが呼び出されましたが、これはエラーケースです")
 	})
 
 	// ログにエラーメッセージが含まれていることを確認
 	expectedLog := "エラー: WebSocketメッセージのパースに失敗しました"
-	if !strings.Contains(logOutput.String(), expectedLog) {
-		t.Errorf("ログに期待するエラー '%s' が含まれていませんでした: %s", expectedLog, logOutput.String())
+	if !strings.Contains(logBuffer.String(), expectedLog) {
+		t.Errorf("ログに期待するエラー '%s' が含まれていませんでした: %s", expectedLog, logBuffer.String())
 	}
 }
 
@@ -208,8 +211,9 @@ func TestRunApp_MissingMatchText(t *testing.T) {
 		},
 	}
 
-	var logOutput bytes.Buffer
-	err := runApp(config, &logOutput)
+	var logBuffer bytes.Buffer
+	logger := log.New(&logBuffer, "", log.Ldate|log.Ltime)
+	err := runApp(config, logger)
 
 	if err == nil {
 		t.Fatal("エラーが発生することを期待しましたが、発生しませんでした")
@@ -315,8 +319,9 @@ func TestRunApp_MissingURL(t *testing.T) {
 		},
 	}
 
-	var logOutput bytes.Buffer
-	err := runApp(config, &logOutput)
+	var logBuffer bytes.Buffer
+	logger := log.New(&logBuffer, "", log.Ldate|log.Ltime)
+	err := runApp(config, logger)
 
 	if err == nil {
 		t.Fatal("エラーが発生することを期待しましたが、発生しませんでした")
@@ -345,8 +350,9 @@ func TestRunApp_MissingToken(t *testing.T) {
 		},
 	}
 
-	var logOutput bytes.Buffer
-	err := runApp(config, &logOutput)
+	var logBuffer bytes.Buffer
+	logger := log.New(&logBuffer, "", log.Ldate|log.Ltime)
+	err := runApp(config, logger)
 
 	if err == nil {
 		t.Fatal("エラーが発生することを期待しましたが、発生しませんでした")
@@ -370,7 +376,9 @@ func TestCreateReaction_RequestCreationError(t *testing.T) {
 
 func TestStreamNotes_DialError(t *testing.T) {
 	// 存在しないサーバーへの接続を試みる
-	err := streamNotes("ws://localhost:9999", "token", &bytes.Buffer{}, func(noteID, noteText string) {
+	var logBuffer bytes.Buffer
+	logger := log.New(&logBuffer, "", log.Ldate|log.Ltime)
+	err := streamNotes("ws://localhost:9999", "token", logger, func(noteID, noteText string) {
 		t.Error("コールバックが呼び出されるべきではありません")
 	})
 	if err == nil {
