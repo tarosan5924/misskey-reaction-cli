@@ -79,7 +79,7 @@ func TestRunApp_ConfigPathFlag(t *testing.T) {
 	fs.String("config", configPath, "設定ファイルのパス")
 
 	// runApp を呼び出す
-	err := runApp(fs, configPath, &stdout, &stderr)
+	err := runApp(configPath, &stdout, &stderr)
 
 	// エラーが返されることを期待する（まだ実装されていないため）
 	if err == nil {
@@ -212,7 +212,7 @@ reaction:
 	fs.SetOutput(&stderr) // エラー出力をキャプチャ
 
 	// runApp を呼び出す
-	err = runApp(fs, tmpfile.Name(), &stdout, &stderr)
+	err = runApp(tmpfile.Name(), &stdout, &stderr)
 
 	// エラーが返されることを期待する
 	if err == nil {
@@ -228,11 +228,11 @@ reaction:
 
 func TestCheckTextMatch(t *testing.T) {
 	tests := []struct {
-		name       string
-		matchType  string
-		noteText   string
-		matchText  string
-		expected   bool
+		name      string
+		matchType string
+		noteText  string
+		matchText string
+		expected  bool
 	}{
 		{"前方一致_一致", "prefix", "hello world", "hello", true},
 		{"前方一致_不一致", "prefix", "hello world", "world", false},
@@ -249,9 +249,9 @@ func TestCheckTextMatch(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			config := &Config{
 				Reaction: struct {
-					Emoji      string `yaml:"emoji"`
-					MatchText  string `yaml:"match_text"`
-					MatchType  string `yaml:"match_type"`
+					Emoji     string `yaml:"emoji"`
+					MatchText string `yaml:"match_text"`
+					MatchType string `yaml:"match_type"`
 				}{
 					MatchText: tt.matchText,
 					MatchType: tt.matchType,

@@ -187,7 +187,7 @@ func checkTextMatch(noteText string, config *Config) bool {
 	}
 }
 
-func runApp(fs *flag.FlagSet, configPath string, stdout, stderr io.Writer) error {
+func runApp(configPath string, stdout, stderr io.Writer) error {
 
 	// 設定ファイルを読み込む
 	config, err := loadConfig(configPath)
@@ -247,7 +247,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if err := runApp(fs, *configPath, os.Stdout, os.Stderr); err != nil {
+	if err := runApp(*configPath, os.Stdout, os.Stderr); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
