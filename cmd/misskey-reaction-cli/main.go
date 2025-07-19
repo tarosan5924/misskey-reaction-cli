@@ -253,7 +253,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 	// ログ出力先を設定
 	var logOutput io.Writer = stdout
 	if config.LogPath != "" {
-		logFile, err := os.OpenFile(config.LogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		logFile, err := os.OpenFile(config.LogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 		if err != nil {
 			// ログファイルが開けないエラーはstderrに
 			fmt.Fprintf(stderr, "ログファイルを開けませんでした: %v\n", err)
@@ -277,4 +277,3 @@ func main() {
 		os.Exit(1)
 	}
 }
-
